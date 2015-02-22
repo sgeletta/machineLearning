@@ -1,0 +1,74 @@
+---
+title: "Machine Learning Project Write-up"
+author: "Simon Geletta"
+date: "Sunday, February 22, 2015"
+output: html_document
+---
+###Executive Summary
+The goal of this study is to use machine learning to predict the "quality" of exercise (weight lifting) by five individuals who participated in the experiment voluntirily (by collecting the data on themselves).
+After evaluating several prediction models (such as regression tree, bagging etc.) the "random forest" approach was chosen for its in-sample accuracy. The model was then applied to a test case of 20 instances of weight lifting. 
+The in-sample prediction achieved __ level of accuracy. If we consider the predictions that are published in the week's auto-graded assignment, then the out of sample accuracy of my random forest prediction is perfect (100%)
+
+
+### Introduction
+
+Of late, there have been a movement called "Human Activity Recognition" in which devices such as Jawbone Up, Nike FuelBand, and Fitbit are used to collect data about personal activities (see Leek at the following url: https://class.coursera.org/predmachlearn-011/human_grading/view/courses/973546/assessments/4/submissions). Studies of such data have traditionally emphasized quantifying how much of a particular activities are done. In this study I will investigate how well weight-lifting is done by the six volunteer subjects. I use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. The goal is to recognize if a subject executed the activity correctly (A), or if they made four different common errors. The errors are described by Ugulino et. al., at this site: http://groupware.les.inf.puc-rio.br/har
+
+###Method
+The weight-lifting data for this study were obtained from HAR study site ( http://groupware.les.inf.puc-rio.br/har). The data have been downloaded using a separate code. The following R code reads the training and the test data and shows the data in the training set. The test set contains all the predictors in the training set except the outcome variable "classe"
+
+```{r}
+
+trainData<-read.csv("C:\\Users\\Simon\\Documents\\GitHub\\machineLearning\\training.csv")
+testData<-read.csv("C:\\Users\\Simon\\Documents\\GitHub\\machineLearning\\test.csv")
+
+```
+
+The next step is to perform some data cleaning. First, the training set includes some fields that are summary statistics fields. These need to be removed. The statistics fields to be removed are measures of kurtosis, skewness, maximum, minimum, amplitude, total, average, variance and standard deviations. These fields are separately stored on rows identified by a field called "new_window". The rows will be removed to limit the observations to one episode of exercise per row of data. After that is accomplished, the variables that are going to be used for the prediction will be displayed using the summary() function.
+
+```{r}
+trainDat<-subset(trainData, select = grep("kurt", invert=TRUE, names(trainData)))
+trainDat<-subset(trainDat, select = grep("skew", invert=TRUE, names(trainDat)))
+trainDat<-subset(trainDat, select = grep("max", invert=TRUE, names(trainDat)))
+trainDat<-subset(trainDat, select = grep("min", invert=TRUE, names(trainDat)))
+trainDat<-subset(trainDat, select = grep("ampl", invert=TRUE, names(trainDat)))
+trainDat<-subset(trainDat, select = grep("tota", invert=TRUE, names(trainDat)))
+trainDat<-subset(trainDat, select = grep("var", invert=TRUE, names(trainDat)))
+trainDat<-subset(trainDat, select = grep("stdd", invert=TRUE, names(trainDat)))
+trainDat<-subset(trainDat, select = grep("avg", invert=TRUE, names(trainDat)))
+trainDat<-subset(trainDat, new_window=="no")
+trainDat<-subset(trainDat, select = grep("^new_win", invert=TRUE, names(trainDat)))
+trainDat$classe<-factor(trainDat$classe)
+training<-trainDat[6:55]
+summary(training)
+```
+### The Analysis
+Start out with partitioning the training data into training development (70%) and validation (30%). Then different classification algorithms will be used to select the model with the least prediction error. I will show the first prediction algorithm (regression tree provided in the "caret" package called "rpart"), just for example. Note that here, the resampling technique of "bootstrapping" will be used for modeling.
+
+```{r}
+library(caret)
+library(rpart)
+trainIndex = createDataPartition(y=training$classe,p=0.7,list=FALSE)
+trData = training[trainIndex,]
+tstData = training[-trainIndex,]
+dim(trData)
+dim(tstData)
+modelFit<- train(classe~ ., data=trData, method="rpart")
+modelFit
+
+```
+It is obvious from the above that the "rpart" does not result in an acceptable level of prediction error. After trying out several models (not presented in here), the "random forest" algorithm produced an acceptable level of error. 
+###The final model
+Because calling the "random forest" algorithm from within the Caret package took extremely long, I will implement it by directly applying it to the training data. Below, I will present the implementaiton using the full training data (not the partitioned training data). I will then show the final validation using the test set that is downloaded from the assignment site. I will also start by setting the seed for random sampling as suggested in the assignment.
+
+```{r}
+library(randomForest)
+set.seed(12343)
+modFit<-randomForest(formula = classe ~ ., data = training)
+modFit
+```
+I will consider the above error level as acceptable and use it for out of sample prediction. The result corresponds with the expectation of the "submission" section of the assignment.
+```{r}
+predictions<-predict(modFit, newdata=testData)
+predictions
+```
